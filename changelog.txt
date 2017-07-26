@@ -1,3 +1,23 @@
+version 1.2.15 ( updated 7-14-2017 )
+- Updated core framework to the latest version.
+	* core/components/PageResource.php
+	* core/components/PageResource.php
+	* core/functions.php
+
+version 1.2.14 ( updated 7-10-2017 )
+- Updated core framework to the latest versions.
+- Fixed a bug that caused errors to occur on SiteGround hosting accounts for some customers when the Elegant Themes caching system attempted to clear the SiteGround cache during plugin & theme activation.
+	* core/components/PageResource.php
+	* core/components/data/Utils.php
+	* core/components/init.php
+	* core/functions.php
+	* core/init.php
+
+version 1.2.13 ( updated 7-8-2017 )
+- Updated core framework to the latest version.
+	* core/components/PageResource.php
+	* core/components/init.php
+
 version 1.2.12 ( updated 7-2-2017 )
 - Updated core framework to the latest version.
 	* core/components/PageResource.php

@@ -2,7 +2,7 @@
 /*
  * Plugin Name: Bloom
  * Plugin URI: http://www.elegantthemes.com/plugins/bloom/
- * Version: 1.2.12
+ * Version: 1.2.15
  * Description: A simple, comprehensive and beautifully constructed email opt-in plugin built to help you quickly grow your mailing list.
  * Author: Elegant Themes
  * Author URI: http://www.elegantthemes.com
@@ -21,7 +21,7 @@ if ( ! class_exists( 'ET_Dashboard' ) ) {
 }
 
 class ET_Bloom extends ET_Dashboard {
-	var $plugin_version = '1.2.12';
+	var $plugin_version = '1.2.15';
 	var $db_version = '1.1';
 	var $_options_pagename = 'et_bloom_options';
 	var $menu_page;
@@ -70,8 +70,6 @@ class ET_Bloom extends ET_Dashboard {
 		$plugin_file = plugin_basename( __FILE__ );
 		add_filter( "plugin_action_links_{$plugin_file}", array( $this, 'add_settings_link' ) );
 
-		add_action( 'after_setup_theme', array( $this, 'maybe_load_core' ), 11 );
-		add_action( 'after_setup_theme', array( $this, 'maybe_update_options_schema' ), 11 );
 		add_action( 'after_setup_theme', array( $this, 'construct_dashboard' ), 11 );
 
 		// Register save settings function for ajax request
@@ -159,7 +157,9 @@ class ET_Bloom extends ET_Dashboard {
 			add_action( "admin_head-$hook", array( $this, 'add_mce_button_filters' ) );
 		}
 
-		add_action( 'after_setup_theme', array( $this, 'add_updates' ), 9 );
+		$this->maybe_load_core();
+		$this->maybe_update_options_schema();
+		et_core_enable_automatic_updates( ET_BLOOM_PLUGIN_URI, $this->plugin_version );
 	}
 
 	function construct_dashboard() {
@@ -175,28 +175,10 @@ class ET_Bloom extends ET_Dashboard {
 		parent::__construct( $dashboard_args );
 	}
 
-	function add_updates() {
-		require_once ET_BLOOM_PLUGIN_DIR . 'core/updates_init.php';
-		et_core_enable_automatic_updates( ET_BLOOM_PLUGIN_URI, $this->plugin_version );
-	}
-
 	public function maybe_load_core() {
-		$has_core     = defined( 'ET_CORE' );
-		$has_new_core = function_exists( 'et_core_get_component_names' );
-
-		if ( $has_core && ! $has_new_core ) {
-			define( 'ET_CORE_OVERRIDE', true );
-			define( 'ET_CORE_PATH_OVERRIDE', ET_BLOOM_PLUGIN_DIR . 'core/' );
-		}
-
-		if ( ! $has_core || ! $has_new_core ) {
+		if ( ! defined( 'ET_CORE' ) ) {
 			require_once ET_BLOOM_PLUGIN_DIR . 'core/init.php';
-		}
-
-		if ( ! $has_core ) {
-			et_core_setup( ET_BLOOM_PLUGIN_URI );
-		} else if ( ! $has_new_core ) {
-			et_new_core_setup();
+			et_core_setup();
 		}
 
 		$this->providers = new ET_Core_API_Email_Providers( 'bloom' );
