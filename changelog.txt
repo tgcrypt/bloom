@@ -1,3 +1,13 @@
+version 1.2.23 ( updated 2-8-2018 )
+- Updated core framework to the latest version.
+	* core/*
+	
+version 1.2.22 ( updated 12-7-2017 )
+- Updated core framework to the latest version.
+	* core/admin/js/portability.js
+	* core/components/Portability.php
+	* core/functions.php
+
 version 1.2.21 ( updated 11-14-2017 )
 - Addressed WordPress 4.9 compatibility issues.
 	* css/admin.css
