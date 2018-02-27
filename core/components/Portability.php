@@ -219,6 +219,26 @@ final class ET_Core_Portability {
 		exit;
 	}
 
+	private function to_megabytes( $value ) {
+		$unit = strtoupper( substr( $value, -1 ) );
+		$amount = intval( substr( $value, 0, -1 ) );
+
+		// Known units
+		switch ( $unit ) {
+		    case 'G': return $amount << 10;
+		    case 'M': return $amount;
+		}
+
+		if ( is_numeric( $unit ) ) {
+			// Numeric unit is present, assume bytes
+			return intval( $value ) >> 20;
+		}
+
+		// Unknown unit ...
+		return intval( $value );
+
+	}// end to_megabytes()
+
 	/**
 	 * Get selected posts data.
 	 *
@@ -626,7 +646,7 @@ final class ET_Core_Portability {
 			}
 
 			// Extract images from html or shortcodes.
-			if ( preg_match_all( '/(src|image_url|image|url)="(?P<src>\w+[^"]*)"/i', $value, $matches ) ) {
+			if ( preg_match_all( '/(src|image_url|image|url|bg_img_?\d?)="(?P<src>\w+[^"]*)"/i', $value, $matches ) ) {
 				foreach ( array_unique( $matches['src'] ) as $key => $src ) {
 					$images = array_merge( $images, $this->get_data_images( array( $key => $src ) ) );
 				}
@@ -1003,13 +1023,14 @@ final class ET_Core_Portability {
 		wp_localize_script( 'et-core-portability', 'etCorePortability', array(
 			'nonce'         => wp_create_nonce( 'et_core_portability_nonce' ),
 			'postMaxSize'   => (int) @ini_get( 'post_max_size' ),
-			'uploadMaxSize' => (int) @ini_get( 'upload_max_filesize' ),
+			'uploadMaxSize' => $this->to_megabytes( @ini_get( 'upload_max_filesize' ) ),
 			'text'          => array(
 				'browserSupport'      => esc_html__( 'The browser version you are currently using is outdated. Please update to the newest version.', ET_CORE_TEXTDOMAIN ),
 				'memoryExhausted'     => esc_html__( 'You reached your server memory limit. Please try increasing your PHP memory limit.', ET_CORE_TEXTDOMAIN ),
 				'maxSizeExceeded'     => esc_html__( 'This file cannot be imported. It may be caused by file_uploads being disabled in your php.ini. It may also be caused by post_max_size or/and upload_max_filesize being smaller than file selected. Please increase it or transfer more substantial data at the time.', ET_CORE_TEXTDOMAIN ),
 				'invalideFile'        => esc_html__( 'Invalid File format. You should be uploading a JSON file.', ET_CORE_TEXTDOMAIN ),
 				'importContextFail'   => esc_html__( 'This file should not be imported in this context.', ET_CORE_TEXTDOMAIN ),
+				'noItemsSelected'     => esc_html__( 'Please select at least one item to export or disable the "Only export selected items" option', ET_CORE_TEXTDOMAIN ),
 				'importing'           => sprintf( esc_html__( 'Import estimated time remaining: %smin', ET_CORE_TEXTDOMAIN ), $time ),
 				'exporting'           => sprintf( esc_html__( 'Export estimated time remaining: %smin', ET_CORE_TEXTDOMAIN ), $time ),
 				'backuping'           => sprintf( esc_html__( 'Backup estimated time remaining: %smin', ET_CORE_TEXTDOMAIN ), $time ),

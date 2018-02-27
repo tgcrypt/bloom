@@ -452,6 +452,13 @@ span.spinner.et_bloom_premade_spinner { float: left; margin-top: -20px; }
 
 .et_bloom .et_bloom_hidden_tab { display: none !important; }
 
+/* Colorpicker */
+
+.et_dashboard_form .wp-picker-container { display: inline-block; }
+.et_dashboard_form .wp-picker-input-wrap label { float: left; }
+.et_dashboard_form span.wp-color-result-text { font-size: 11px; text-transform: capitalize; font-weight: 400; }
+.et_dashboard_form input.et-dashboard-color-picker.wp-color-picker { height: 25px; width: 86px !important; }
+
 /*------------------------------------------------*/
 /*-------------------[Animations]-----------------*/
 /*------------------------------------------------*/
