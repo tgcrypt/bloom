@@ -1,3 +1,7 @@
+version 1.2.24 ( updated 4-19-2018 )
+- Updated core framework to the latest version.
+	* core/*
+
 version 1.2.23 ( updated 2-8-2018 )
 - Updated core framework to the latest version.
 	* core/*
