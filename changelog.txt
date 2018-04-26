@@ -1,3 +1,13 @@
+version 1.2.25 ( updated 4-26-2018 )
+- Fixed iOS detection when page is being viewed on a mobile browser or an in-app browser.
+- Fixed double opt-in when adding new subscribers to a Mailster list.
+- Fixed the broken URL redirection when plugin is displayed as widget.
+- Updated core framework to the latest version.
+	* bloom.php
+	* core/admin/js/common.js
+	* core/components/api/email/Mailster.php
+	* core/components/api/email/Ontraport.php
+
 version 1.2.24 ( updated 4-19-2018 )
 - Updated core framework to the latest version.
 	* core/*
@@ -5,7 +15,7 @@ version 1.2.24 ( updated 4-19-2018 )
 version 1.2.23 ( updated 2-8-2018 )
 - Updated core framework to the latest version.
 	* core/*
-	
+
 version 1.2.22 ( updated 12-7-2017 )
 - Updated core framework to the latest version.
 	* core/admin/js/portability.js

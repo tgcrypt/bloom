@@ -2,7 +2,7 @@
 /*
  * Plugin Name: Bloom
  * Plugin URI: http://www.elegantthemes.com/plugins/bloom/
- * Version: 1.2.24
+ * Version: 1.2.25
  * Description: A simple, comprehensive and beautifully constructed email opt-in plugin built to help you quickly grow your mailing list.
  * Author: Elegant Themes
  * Author URI: http://www.elegantthemes.com
@@ -21,7 +21,7 @@ if ( ! class_exists( 'ET_Dashboard' ) ) {
 }
 
 class ET_Bloom extends ET_Dashboard {
-	var $plugin_version = '1.2.24';
+	var $plugin_version = '1.2.25';
 	var $db_version = '1.1';
 	var $_options_pagename = 'et_bloom_options';
 	var $menu_page;
@@ -4577,8 +4577,8 @@ class ET_Bloom extends ET_Dashboard {
 
 			if ( isset( $selected_optin['success_action_type'] ) && 'default' !== $selected_optin['success_action_type'] ) {
 				$success_action_class = ' et_bloom_success_action';
-				$action_type          = esc_attr( $details['success_action_type'] );
-				$action_info          = esc_url( $details['success_action_info'] );
+				$action_type = esc_attr( $selected_optin['success_action_type'] );
+				$action_info = esc_url( $selected_optin['success_action_info'] );
 				$success_action_data  = " data-success_action_details='{$action_type}|{$action_info}'";
 			}
 
