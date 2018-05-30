@@ -2,7 +2,7 @@
 /*
  * Plugin Name: Bloom
  * Plugin URI: http://www.elegantthemes.com/plugins/bloom/
- * Version: 1.2.25
+ * Version: 1.3
  * Description: A simple, comprehensive and beautifully constructed email opt-in plugin built to help you quickly grow your mailing list.
  * Author: Elegant Themes
  * Author URI: http://www.elegantthemes.com
@@ -21,8 +21,8 @@ if ( ! class_exists( 'ET_Dashboard' ) ) {
 }
 
 class ET_Bloom extends ET_Dashboard {
-	var $plugin_version = '1.2.25';
-	var $db_version = '1.1';
+	var $plugin_version = '1.3';
+	var $db_version = '1.2';
 	var $_options_pagename = 'et_bloom_options';
 	var $menu_page;
 	var $protocol;
@@ -32,6 +32,11 @@ class ET_Bloom extends ET_Dashboard {
 	private static $_this;
 
 	public static $scripts_enqueued = false;
+
+	/**
+	 * @var ET_Core_Data_Utils
+	 */
+	protected static $_;
 
 	/**
 	 * @var \ET_Core_API_Email_Providers
@@ -109,6 +114,8 @@ class ET_Bloom extends ET_Dashboard {
 
 		add_action( 'wp_ajax_bloom_save_updates_tab', array( $this, 'save_updates_tab' ) );
 
+		add_action( 'wp_ajax_bloom_save_google_tab', array( $this, 'save_google_tab' ) );
+
 		add_action( 'wp_ajax_bloom_ab_test_actions', array( $this, 'ab_test_actions' ) );
 
 		add_action( 'wp_ajax_bloom_get_stats_graph_ajax', array( $this, 'get_stats_graph_ajax' ) );
@@ -182,6 +189,8 @@ class ET_Bloom extends ET_Dashboard {
 		}
 
 		$this->providers = new ET_Core_API_Email_Providers( 'bloom' );
+
+		self::$_ = ET_Core_Data_Utils::instance();
 	}
 
 	static function activate_plugin() {
@@ -653,7 +662,6 @@ class ET_Bloom extends ET_Dashboard {
 			record_type varchar(3) NOT NULL,
 			optin_id varchar(20) NOT NULL,
 			list_id varchar(100) NOT NULL,
-			ip_address varchar(45) NOT NULL,
 			page_id varchar(20) NOT NULL,
 			removed_flag boolean NOT NULL,
 			UNIQUE KEY id (id)
@@ -675,6 +683,7 @@ class ET_Bloom extends ET_Dashboard {
 		if ( isset( $options_array['db_version'] ) && version_compare( $options_array['db_version'], '1.1', '<' ) ) {
 			// DB fields were updated in 1.1, so run db_install() for old versions of plugin.
 			// type of "id" field was changed from 'mediumint' to 'int'
+			// In 1.2, the ip_address column was removed to ensure GDPR compliance
 			$this->db_install();
 			$need_version_update = true;
 		}
@@ -849,6 +858,34 @@ class ET_Bloom extends ET_Dashboard {
 							esc_html__( 'enable updates', 'bloom' )
 						)
 					) // #11
+				);
+			break;
+
+			case 'settings' :
+				$google_api_settings = get_option( 'et_google_api_settings' );
+				$google_fonts_disabled = isset( $google_api_settings['use_google_fonts'] ) && 'off' === $google_api_settings['use_google_fonts'];
+				printf( '
+					<div class="et_dashboard_row et_dashboard_updates_settings_row">
+						<h1>%1$s</h1>
+						<div class="et_dashboard_form">
+							<div class="et_dashboard_account_row">
+								<ul>
+									<li class="et_dashboard_checkbox clearfix">
+										<p>%2$s</p>
+										<input type="checkbox" id="et_use_google_fonts" name="et_use_google_fonts" value="%3$s"%4$s/>
+										<label for="et_use_google_fonts"></label>
+									</li>
+								</ul>
+							</div>
+							<button class="et_dashboard_icon et_pb_save_google_settings">%5$s</button>
+							<span class="spinner"></span>
+						</div>
+					</div>' ,
+					esc_html__( 'Bloom Settings', 'bloom' ),
+					esc_html__( 'Use Google Fonts', 'bloom' ),
+					!$google_fonts_disabled,
+					$google_fonts_disabled ? '' : ' checked="checked"',
+					esc_html__( 'Save', 'bloom' )
 				);
 			break;
 		}
@@ -2584,6 +2621,7 @@ class ET_Bloom extends ET_Dashboard {
 			'cannot_activate_text' => esc_html__( 'You Have Not Added An Email List. Before your opt-in can be activated, you must first add an account and select an email list.', 'bloom' ),
 			'save_settings'        => wp_create_nonce( 'save_settings' ),
 			'updates_tab'          => wp_create_nonce( 'updates_tab' ),
+			'google_tab'           => wp_create_nonce( 'google_tab' ),
 			'all_optins_list'      => json_encode( $this->get_all_optins_list() ),
 			'last_record_date'     => sanitize_text_field( $this->get_last_record_date() ),
 		) );
@@ -3183,12 +3221,13 @@ class ET_Bloom extends ET_Dashboard {
 			die( json_encode( array( 'error' => esc_html__( 'Invalid email', 'bloom' ) ) ) );
 		}
 
-		$provider = $this->_get_provider( $service, $account_name );
-
-		if ( false === $provider ) {
-			// New wrapper class not yet implemented for this provider. Returning to legacy handler.
-			return;
+		if ( ! $provider = $this->_get_provider( $service, $account_name ) ) {
+			et_core_die( esc_html__( 'Configuration Error: Invalid data.', 'bloom' ) );
 		}
+
+		$custom_fields = self::$_->sanitize_text_fields( self::$_->array_get( $_POST, 'custom_fields', array() ) );
+
+		$subscribe_data_array['custom_fields'] = $custom_fields;
 
 		$error_message = $provider->subscribe( $subscribe_data_array );
 
@@ -3661,7 +3700,6 @@ class ET_Bloom extends ET_Dashboard {
 
 	/**
 	 * Adds the record to stats table. Either conversion or impression for specific list on specific form on specific page.
-	 * @return void
 	 */
 	public static function add_stats_record( $type, $optin_id, $page_id, $list_id ) {
 		// do not update stats if visitor logged in
@@ -3671,16 +3709,18 @@ class ET_Bloom extends ET_Dashboard {
 
 		global $wpdb;
 
-		$row_added = false;
-
 		$table_name = $wpdb->prefix . 'et_bloom_stats';
+		$cookie     = "et_bloom_{$optin_id}_{$list_id}_{$type}";
 
 		if ( $wpdb->get_var( "SHOW TABLES LIKE '$table_name'" ) !== $table_name ) {
 			return;
 		}
 
+		if ( isset( $_COOKIE[ $cookie ] ) ) {
+			return;
+		}
+
 		$record_date = current_time( 'mysql' );
-		$ip_address  = et_core_get_ip_address();
 
 		$fields = array(
 			'record_date'  => sanitize_text_field( $record_date ),
@@ -3688,8 +3728,7 @@ class ET_Bloom extends ET_Dashboard {
 			'record_type'  => sanitize_text_field( $type ),
 			'page_id'      => (int) $page_id,
 			'list_id'      => sanitize_text_field( $list_id ),
-			'ip_address'   => sanitize_text_field( $ip_address ),
-			'removed_flag' => (int) 0,
+			'removed_flag' => 0,
 		);
 
 		$format = array(
@@ -3698,15 +3737,12 @@ class ET_Bloom extends ET_Dashboard {
 			'%s', // record_type
 			'%d', // page_id
 			'%s', // list_id
-			'%s', // ip_address
 			'%d', // removed_flag
 		);
 
 		$wpdb->insert( $table_name, $fields, $format );
 
-		$row_added = true;
-
-		return $row_added;
+		return;
 	}
 
 	/**
@@ -3732,10 +3768,277 @@ class ET_Bloom extends ET_Dashboard {
 		die();
 	}
 
+	/**
+	 * Saves the Google Settings
+	 */
+	function save_google_tab() {
+		et_core_security_check( 'manage_options', 'google_tab' );
+
+		$google_fonts_value = ! empty( $_POST['et_bloom_use_google_fonts'] ) ? sanitize_text_field( $_POST['et_bloom_use_google_fonts'] ) : '';
+
+		if ( '' !== $google_fonts_value ) {
+			$google_api_settings = get_option( 'et_google_api_settings' );
+			$google_api_settings['use_google_fonts'] = $google_fonts_value;
+
+			update_option( 'et_google_api_settings', $google_api_settings );
+		}
+
+		die();
+	}
+
 	// add marker at the bottom of the_content() for the "Trigger at bottom of post" option.
 	function trigger_bottom_mark( $content ) {
 		$content .= '<span class="et_bloom_bottom_trigger"></span>';
 		return $content;
+	}
+
+	public static function get_field_restrictions($field) {
+		$pattern         = '';
+		$title           = '';
+		$symbols_pattern = '.';
+		$length_pattern  = '*';
+		$allowed_symbols = isset( $field->allowed_symbols ) ? $field->allowed_symbols : 'any';
+		$min_length      = isset( $field->min_length ) ? intval( $field->min_length ) : 0;
+		$max_length      = isset( $field->max_length ) ? intval( $field->max_length ) : 0;
+		$max_length_attr = '';
+
+		if ( in_array( $allowed_symbols, array( 'letters', 'numbers', 'alphanumeric' ) ) ) {
+			switch ( $allowed_symbols ) {
+				case 'letters':
+					$symbols_pattern = '[A-Z|a-z]';
+					$title           = __( 'Only letters allowed.', 'bloom' );
+					break;
+				case 'numbers':
+					$symbols_pattern = '[0-9]';
+					$title           = __( 'Only numbers allowed.', 'bloom' );
+					break;
+				case 'alphanumeric':
+					$symbols_pattern = '[A-Z|a-z|0-9]';
+					$title           = __( 'Only letters and numbers allowed.', 'bloom' );
+					break;
+			}
+		}
+
+		if ( 0 !== $min_length && 0 !== $max_length ) {
+			$max_length = max( $min_length, $max_length );
+			$min_length = min( $min_length, $max_length );
+
+			if ( $max_length > 0 ) {
+				$max_length_attr = sprintf(
+					' maxlength="%1$d"',
+					$max_length
+				);
+			}
+		}
+
+		if ( 0 !== $min_length || 0 !== $max_length ) {
+			$length_pattern = '{';
+
+			if ( 0 !== $min_length ) {
+				$length_pattern .= $min_length;
+				$title   .= sprintf( __( 'Minimum length: %1$d characters. ', 'bloom' ), $min_length );
+			}
+
+			if ( 0 === $max_length ) {
+				$length_pattern .= ',';
+			}
+
+			if ( 0 === $min_length ) {
+				$length_pattern .= '0';
+			}
+
+			if ( 0 !== $max_length ) {
+				$length_pattern .= ",{$max_length}";
+				$title   .= sprintf( __( 'Maximum length: %1$d characters.', 'bloom' ), $max_length );
+			}
+
+
+			$length_pattern .= '}';
+		}
+
+		if ( '' !== $title ) {
+			$title = sprintf(
+				' title="%1$s"',
+				esc_attr( $title )
+			);
+		}
+
+		if ( '.' !== $symbols_pattern || '*' !== $length_pattern ) {
+			$pattern = sprintf(
+				' pattern="%1$s%2$s"%3$s%4$s',
+				esc_attr( $symbols_pattern ),
+				esc_attr( $length_pattern ),
+				$title,
+				$max_length_attr
+			);
+		}
+
+		return $pattern;
+	}
+
+	public static function generate_custom_fields_html( $optin_id, $settings ) {
+		if ( 'on' !== self::$_->array_get( $settings, 'use_custom_fields' ) ) {
+			return '';
+		}
+
+		if ( ! $custom_fields = self::$_->array_get( $settings, 'custom_fields' ) ) {
+			return '';
+		}
+
+		$custom_fields = json_decode( $custom_fields );
+		$output        = '';
+
+		foreach ( $custom_fields as $field ) {
+			if ( ! isset( $field->field_type ) ) {
+				continue;
+			}
+
+			$is_required_field = ! isset( $field->required_mark ) || 'off' !== $field->required_mark;
+			$is_hidden_field = isset( $field->hidden ) && 'on' === $field->hidden;
+			$fullwidth = isset( $field->fullwidth_field ) && 'on' === $field->fullwidth_field;
+			$output   .= sprintf(
+				'<p class="et_bloom_custom_field%1$s%2$s"%3$s>',
+				$fullwidth ? ' et_bloom_fullwidth_field' : '',
+				in_array( $field->field_type, array( 'input', 'email', 'textarea' ) ) ? ' et_bloom_popup_input' : '',
+				$is_hidden_field ? ' style="display: none;"' : ''
+			);
+
+			switch ( $field->field_type ) {
+				case 'checkbox':
+					$options        = $field->checkbox_options;
+					$options_output = '';
+
+					foreach ( $options as $option_index => $option ) {
+						$option_id     = isset( $option->id ) ? $option->id : $option_index;
+						$link_html     = '';
+						$has_link_url  = isset( $option->link_url ) && $option->link_url;
+						$has_link_text = isset( $option->link_text ) && $option->link_text;
+
+						if ( $has_link_url ) {
+							$link_text = $has_link_text ? $option->link_text : '';
+							$link_html = sprintf( ' <a href="%1$s">%2$s</a>', esc_url( $option->link_url ), esc_html( $link_text ) );
+						}
+
+						$options_output .= sprintf(
+							'<span class="et_bloom_custom_field_checkbox">
+								<input type="checkbox" id="%1$s" value="%2$s" data-id="%3$s"%4$s/>
+								<label for="%1$s"><i></i>%2$s%5$s</label>
+							</span>',
+							esc_attr( "et_bloom_custom_field_{$optin_id}_{$field->field_id}_{$option_id}" ),
+							esc_attr( $option->value ),
+							esc_attr( $option_id ),
+							checked( $option->checked, 1, false ),
+							$link_html
+						);
+					}
+
+					$output .= sprintf(
+						'<input class="et_bloom_checkbox_handle" type="hidden" name="%1$s" data-field_type="%2$s" data-id="%3$s" data-required_mark="%6$s">
+						<span class="et_bloom_custom_field_options_wrapper">
+							<span class="et_bloom_custom_field_options_title">%4$s</span>
+							<span class="et_bloom_custom_field_options_list">%5$s</span>
+						</span>',
+						esc_attr( "et_bloom_custom_field_{$optin_id}_{$field->field_id}" ),
+						esc_attr( $field->field_type ),
+						esc_attr( $field->field_id ),
+						esc_html( $field->field_title ),
+						$options_output,
+						$is_required_field ? 'required' : 'not_required'
+					);
+					break;
+
+				case 'radio':
+					$options        = $field->radio_options;
+					$options_output = '';
+
+					foreach ( $options as $option_index => $option ) {
+						$link_html     = '';
+						$has_link_url  = isset( $option->link_url ) && $option->link_url;
+						$has_link_text = isset( $option->link_text ) && $option->link_text;
+						$option_id     = isset( $option->id ) ? $option->id : $option_index;
+
+						if ( $has_link_url ) {
+							$link_text = $has_link_text ? $option->link_text : '';
+							$link_html = sprintf( ' <a href="%1$s">%2$s</a>', esc_url( $option->link_url ), esc_html( $link_text ) );
+						}
+
+						$options_output .= sprintf(
+							'<span class="et_bloom_custom_field_radio">
+								<input id="%1$s" type="radio" name="%6$s" value="%2$s" data-id="%3$s" data-required_mark="%7$s"%4$s/>
+								<label for="%1$s"><i></i>%2$s%5$s</label>
+							</span>',
+							esc_attr( "et_bloom_custom_field_{$optin_id}_{$field->field_id}_{$option_id}" ),
+							esc_attr( $option->value ),
+							esc_attr( $option_id ),
+							checked( $option->checked, 1, false ),
+							$link_html,
+							esc_attr( "et_bloom_custom_field_{$optin_id}_{$field->field_id}" ),
+							$is_required_field ? 'required' : 'not_required'
+						);
+					}
+
+					$output .= sprintf(
+						'<span class="et_bloom_custom_field_options_wrapper" id="%1$s" data-field_type="%2$s" data-id="%3$s">
+							<span class="et_bloom_custom_field_options_title">%4$s</span>
+							<span class="et_bloom_custom_field_options_list">%5$s</span>
+						</span>',
+						esc_attr( "et_bloom_custom_field_{$optin_id}_{$field->field_id}" ),
+						esc_attr( $field->field_type ),
+						esc_attr( $field->field_id ),
+						esc_html( $field->field_title ),
+						$options_output
+					);
+					break;
+
+				case 'input':
+				case 'textarea':
+				case 'email':
+					$output .= sprintf(
+						'<%1$s%5$s name="%2$s" data-id="%3$s" placeholder="%4$s" data-field_type="%8$s" data-required_mark="%6$s"%7$s %9$s',
+						'email' === $field->field_type ? 'input' : esc_html( $field->field_type ),
+						esc_attr( "et_bloom_custom_field_{$optin_id}_{$field->field_id}" ),
+						esc_attr( $field->field_id ),
+						esc_html( $field->field_title ),
+						'textarea' !== $field->field_type ? ' type="text"' : '',
+						$is_required_field ? 'required' : 'not_required',
+						'input' === $field->field_type ? self::get_field_restrictions( $field ) : '',
+						esc_attr( $field->field_type ),
+						'textarea' === $field->field_type ? '></textarea>' : '/>'
+					);
+					break;
+
+				case 'select':
+					$options        = $field->select_options;
+					$options_output = sprintf( '<option value="">%1$s</option>', $field->field_title );
+
+					foreach ( $options as $option_index => $option ) {
+						$option_id = isset( $option->id ) ? $option->id : $option_index;
+						$options_output .= sprintf(
+							'<option value="%1$s" data-id="%2$s"%3$s>%4$s</option>',
+							esc_attr( $option->value ),
+							esc_attr( "et_bloom_custom_field_{$optin_id}_{$option_id}" ),
+							selected( $option->checked, 1, false ),
+							esc_html( $option->value )
+						);
+					}
+
+					$output .= sprintf(
+						'<select class="et_bloom_checkbox_handle" name="%1$s" data-field_type="%2$s" data-id="%3$s" data-required_mark="%5$s">
+							%4$s
+						</select>',
+						esc_attr( "et_bloom_custom_field_{$optin_id}_{$field->field_id}" ),
+						esc_attr( $field->field_type ),
+						esc_attr( $field->field_id ),
+						$options_output,
+						$is_required_field ? 'required' : 'not_required'
+					);
+					break;
+			}
+
+			$output .= '</p>';
+		}
+
+		return $output;
 	}
 
 	/**
@@ -3777,23 +4080,28 @@ class ET_Bloom extends ET_Dashboard {
 			$footer_text      = $details['footer_text'];
 		}
 
+		$use_custom_fields   = 'on' === self::$_->array_get( $details, 'use_custom_fields' );
+		$inline_fields       = 'inline' === self::$_->array_get( $details, 'field_orientation' );
+		$name_fullwidth      = $use_custom_fields && $inline_fields && 'on' === self::$_->array_get( $details, 'name_fullwidth' );
+		$last_name_fullwidth = $use_custom_fields && $inline_fields && 'on' === self::$_->array_get( $details, 'last_name_fullwidth' );
+		$email_fullwidth     = $use_custom_fields && $inline_fields && 'on' === self::$_->array_get( $details, 'email_fullwidth' );
+		$ip_address          = self::$_->array_get( $details, 'ip_address' ) ? 'true' : 'false';
+
 		$formatted_title = '&lt;h2&gt;&nbsp;&lt;/h2&gt;' != $details['optin_title']
 			? str_replace( '&nbsp;', '', $optin_title )
 			: '';
 		$formatted_message = '' != $details['optin_message'] ? $optin_message : '';
+
 		$formatted_footer = '' != $details['footer_text']
-			? sprintf(
-				'<div class="et_bloom_form_footer">
-					<p>%1$s</p>
-				</div>',
-				stripslashes( esc_html( $footer_text ) )
-			)
+			? sprintf( '<div class="et_bloom_form_footer">%1$s</div>', html_entity_decode( $footer_text, ENT_QUOTES, 'UTF-8' ) )
 			: '';
 
 		$is_single_name = ( isset( $details['display_name'] ) && '1' == $details['display_name'] ) ? false : true;
 
+		$custom_fields_html = self::generate_custom_fields_html( $optin_id, $details );
+
 		$output = sprintf( '
-			<div class="et_bloom_form_container_wrapper clearfix">
+			<div class="et_bloom_form_container_wrapper clearfix%14$s">
 				<div class="et_bloom_header_outer">
 					<div class="et_bloom_form_header%1$s%13$s">
 						%2$s
@@ -3872,15 +4180,17 @@ class ET_Bloom extends ET_Dashboard {
 				: sprintf( '
 					%1$s
 					<form method="post" class="clearfix">
-						%3$s
-						<p class="et_bloom_popup_input et_bloom_subscribe_email">
-							<input placeholder="%2$s">
-						</p>
-
-						<button data-optin_id="%4$s" data-service="%5$s" data-list_id="%6$s" data-page_id="%7$s" data-account="%8$s" data-disable_dbl_optin="%11$s" class="et_bloom_submit_subscription%12$s">
-							<span class="et_bloom_subscribe_loader"></span>
-							<span class="et_bloom_button_text et_bloom_button_text_color_%10$s">%9$s</span>
-						</button>
+						<div class="et_bloom_fields">
+							%3$s
+							<p class="et_bloom_popup_input et_bloom_subscribe_email%14$s">
+								<input placeholder="%2$s">
+							</p>
+							%13$s
+							<button data-optin_id="%4$s" data-service="%5$s" data-list_id="%6$s" data-page_id="%7$s" data-account="%8$s" data-disable_dbl_optin="%11$s" data-ip_address="%15$s" class="et_bloom_submit_subscription%12$s">
+								<span class="et_bloom_subscribe_loader"></span>
+								<span class="et_bloom_button_text et_bloom_button_text_color_%10$s">%9$s</span>
+							</button>
+						</div>
 					</form>',
 					'basic_edge' == $details['edge_style'] || '' == $details['edge_style']
 						? ''
@@ -3889,7 +4199,7 @@ class ET_Bloom extends ET_Dashboard {
 					( 'no_name' == $details['name_fields'] && ! ET_Bloom::is_only_name_support( $details['email_provider'] ) ) || ( ET_Bloom::is_only_name_support( $details['email_provider'] ) && $is_single_name )
 						? ''
 						: sprintf(
-							'<p class="et_bloom_popup_input et_bloom_subscribe_name">
+							'<p class="et_bloom_popup_input et_bloom_subscribe_name%4$s">
 								<input placeholder="%1$s%2$s" maxlength="50">
 							</p>%3$s',
 							'first_last_name' == $details['name_fields']
@@ -3906,12 +4216,14 @@ class ET_Bloom extends ET_Dashboard {
 									: esc_attr__( 'Name', 'bloom' ) ) : '',
 							'first_last_name' == $details['name_fields'] && ! ET_Bloom::is_only_name_support( $details['email_provider'] )
 								? sprintf( '
-									<p class="et_bloom_popup_input et_bloom_subscribe_last">
+									<p class="et_bloom_popup_input et_bloom_subscribe_last%2$s">
 										<input placeholder="%1$s" maxlength="50">
 									</p>',
-									'' != $last_name_text ? stripslashes( esc_attr( $last_name_text ) ) : esc_attr__( 'Last Name', 'bloom' )
+									'' != $last_name_text ? stripslashes( esc_attr( $last_name_text ) ) : esc_attr__( 'Last Name', 'bloom' ),
+									$last_name_fullwidth ? ' et_bloom_fullwidth_field' : ''
 								)
-								: ''
+								: '',
+							$name_fullwidth ? ' et_bloom_fullwidth_field' : ''
 						),
 					esc_attr( $optin_id ),
 					esc_attr( $details['email_provider'] ), //#5
@@ -3921,7 +4233,10 @@ class ET_Bloom extends ET_Dashboard {
 					'' != $button_text ? stripslashes( esc_html( $button_text ) ) :  esc_html__( 'SUBSCRIBE!', 'bloom' ),
 					isset( $details['button_text_color'] ) ? esc_attr( $details['button_text_color'] ) : '', // #10
 					isset( $details['disable_dbl_optin'] ) && '1' === $details['disable_dbl_optin'] ? 'disable' : '',
-					'locked' === $details['optin_type'] ? ' et_bloom_submit_subscription_locked' : '' // #12
+					'locked' === $details['optin_type'] ? ' et_bloom_submit_subscription_locked' : '', // #12
+					$custom_fields_html,
+					$email_fullwidth ? ' et_bloom_fullwidth_field' : '',
+					$ip_address // #15
 				), //#9
 			'' != $success_text
 				? wp_kses( html_entity_decode( stripslashes( $success_text ) ), array(
@@ -3954,7 +4269,8 @@ class ET_Bloom extends ET_Dashboard {
 					' et_bloom_header_text_%1$s',
 					esc_attr( $details['header_text_color'] )
 				)
-				: ' et_bloom_header_text_dark' //#14
+				: ' et_bloom_header_text_dark',
+			$custom_fields_html ? ' et_bloom_with_custom_fields' : '' //#14
 		);
 
 		return $output;
@@ -4393,9 +4709,7 @@ class ET_Bloom extends ET_Dashboard {
 			$optin_id = $display_optin_id;
 			$details = $all_optins[$optin_id];
 		}
-		if ( true === $update_stats ) {
-			ET_Bloom::add_stats_record( 'imp', $optin_id, $page_id, $list_id );
-		}
+
 		if ( 'below_post' !== $details['optin_type'] ) {
 			$custom_css = ET_Bloom::generate_custom_css( '.et_bloom .et_bloom_' . $display_optin_id, $details );
 			$custom_css_output = '' !== $custom_css ? sprintf( '<style type="text/css">%1$s</style>', $custom_css ) : '';
@@ -4586,8 +4900,6 @@ class ET_Bloom extends ET_Dashboard {
 			$widget_classes = 'et_bloom_widget_content et_bloom_make_form_visible et_bloom_optin';
 			$form_classes   = $edge_style . $border_style . $corner_style . $field_corner_style . $text_color_style . $success_action_class;
 
-			ET_Bloom::add_stats_record( 'imp', $optin_id, $page_id, $list_id );
-
 			$output = "
 				<div class='{$widget_classes} et_bloom_{$optin_id}' style='display: none;'{$success_action_data}>
 					{$custom_css_output}
@@ -4724,6 +5036,8 @@ class ET_Bloom extends ET_Dashboard {
 
 		if ( isset( $single_optin['form_button_color'] ) && '' !== $single_optin['form_button_color'] ) {
 			$custom_css .= esc_html( $form_class ) .  ' .et_bloom_form_content button { background-color: ' . esc_html( $single_optin['form_button_color'] ) . ' !important; } ';
+			$custom_css .= esc_html( $form_class ) . ' .et_bloom_form_content .et_bloom_fields i { color: ' . esc_html( $single_optin['form_button_color'] ) . ' !important; } ';
+			$custom_css .= esc_html( $form_class ) . ' .et_bloom_form_content .et_bloom_custom_field_radio i:before { background: ' . esc_html( $single_optin['form_button_color'] ) . ' !important; } ';
 		}
 
 		if ( isset( $single_optin['border_color'] ) && '' !== $single_optin['border_color'] && 'no_border' !== $single_optin['border_orientation'] ) {

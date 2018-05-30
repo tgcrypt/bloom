@@ -18,6 +18,7 @@ $all_sections = array(
 	),
 	'header' => array(
 		'contents' => array(
+			'settings'     => esc_html__( 'Bloom Settings', 'bloom' ),
 			'updates'      => esc_html__( 'Bloom Updates', 'bloom' ),
 			'stats'        => esc_html__( 'Statistics', 'bloom' ),
 			'accounts'     => esc_html__( 'Email Accounts', 'bloom' ),
@@ -27,6 +28,25 @@ $all_sections = array(
 		),
 	),
 );
+
+$providers       = ET_Core_API_Email_Providers::instance();
+$email_providers = $providers->names_by_slug();
+
+$name_field_only_support = array_keys( $providers->names_by_slug( 'all', 'name_field_only' ) );
+$last_name_field_support = array_diff( array_keys( $email_providers ), $name_field_only_support );
+$custom_fields_support   = array_keys( $providers->names_by_slug( 'all', 'custom_fields' ) );
+
+// Sort alphabetically.
+ksort( $email_providers );
+
+// add the Select One... option as first option now that the list has been alpha sorted
+$email_providers = array(
+	'empty' => esc_html__( 'Select One...', 'bloom' ),
+) + $email_providers;
+
+// add this option to the bottom of the list always
+$email_providers['custom_html'] = esc_html__( 'Custom HTML Form', 'bloom' );
+
 
 /**
  * Array of all options
@@ -44,23 +64,6 @@ $all_sections = array(
  * 'validation_type' and 'name' are required attribute for the option which should be saved into DataBase.
  *
  */
-$providers       = ET_Core_API_Email_Providers::instance();
-$email_providers = $providers->names_by_slug();
-
-$name_field_only_support = array_keys( $providers->names_by_slug( 'all', 'name_field_only' ) );
-$last_name_field_support = array_diff( array_keys( $email_providers ), $name_field_only_support );
-
-// Sort alphabetically.
-ksort( $email_providers );
-
-// add the Select One... option as first option now that the list has been alpha sorted
-$email_providers = array(
-	'empty' => esc_html__( 'Select One...', 'bloom' ),
-) + $email_providers;
-
-// add this option to the bottom of the list always
-$email_providers['custom_html'] = esc_html__( 'Custom HTML Form', 'bloom' );
-
 $dashboard_options_all = array(
 	'optin_name' => array(
 		'section_start' => array(
@@ -90,7 +93,7 @@ $dashboard_options_all = array(
 			'name'            => 'email_provider',
 			'value'           => $email_providers,
 			'default'         => 'empty',
-			'conditional'     => 'mailchimp_account#aweber_account#constant_contact_account#custom_html#display_name#name_fields#disable_dbl_optin#enable_dbl_optin',
+			'conditional'     => 'mailchimp_account#aweber_account#constant_contact_account#custom_html#display_name#name_fields#disable_dbl_optin#enable_dbl_optin#custom_fields_section',
 			'validation_type' => 'simple_text',
 			'class'           => 'et_dashboard_select_provider',
 		),
@@ -124,6 +127,14 @@ $dashboard_options_all = array(
 			'default'         => '',
 			'display_if'      => 'custom_html',
 			'validation_type' => 'html',
+		),
+		'ip_address' => array(
+			'type'            => 'checkbox',
+			'title'           => esc_html__( 'Include IP Address', 'bloom' ),
+			'name'            => 'ip_address',
+			'default'         => 'true',
+			'validation_type' => 'simple_text',
+			'hint_text'       => esc_html__( "Include the subscriber's ip address in the data sent to your email provider.", 'bloom' ),
 		),
 		'disable_dbl_optin' => array(
 			'type'            => 'checkbox',
@@ -318,7 +329,7 @@ $dashboard_options_all = array(
 				'first_last_name' => esc_html__( 'First + Last Name Fields', 'bloom' ),
 			),
 			'default'         => 'no_name',
-			'conditional'     => 'name_text#last_name#single_name_text',
+			'conditional'     => 'name_text#last_name#single_name_text#name_fullwidth#last_name_fullwidth#email_fullwidth',
 			'validation_type' => 'simple_text',
 			'display_if'      => implode( '#', $last_name_field_support ),
 		),
@@ -346,6 +357,14 @@ $dashboard_options_all = array(
 			'validation_type' => 'simple_text',
 			'is_wpml_string'  => true,
 		),
+		'name_fullwidth' => array(
+			'type'            => 'react-portal-container',
+			'name'            => 'name_fullwidth',
+			'title'           => esc_html__( 'Name Fullwidth', 'bloom' ),
+			'display_if'      => 'first_last_name#single_name',
+			'validation_type' => 'simple_text',
+			'default'         => 'off',
+		),
 		'last_name' => array(
 			'type'            => 'input_field',
 			'subtype'         => 'text',
@@ -358,6 +377,14 @@ $dashboard_options_all = array(
 			'validation_type' => 'simple_text',
 			'is_wpml_string'  => true,
 		),
+		'last_name_fullwidth' => array(
+			'type'            => 'react-portal-container',
+			'name'            => 'last_name_fullwidth',
+			'title'           => esc_html__( 'Last Name Fullwidth', 'bloom' ),
+			'display_if'      => 'first_last_name',
+			'validation_type' => 'simple_text',
+			'default'         => 'off',
+		),
 		'email_text' => array(
 			'type'            => 'input_field',
 			'subtype'         => 'text',
@@ -368,6 +395,13 @@ $dashboard_options_all = array(
 			'default'         => '',
 			'validation_type' => 'simple_text',
 			'is_wpml_string'  => true,
+		),
+		'email_fullwidth' => array(
+			'type'            => 'react-portal-container',
+			'name'            => 'email_fullwidth',
+			'title'           => esc_html__( 'Email Fullwidth', 'bloom' ),
+			'validation_type' => 'simple_text',
+			'default'         => 'off',
 		),
 		'button_text' => array(
 			'type'            => 'input_field',
@@ -390,6 +424,25 @@ $dashboard_options_all = array(
 				'dark'  => esc_html__( 'Dark', 'bloom' ),
 			),
 			'default'         => 'light',
+			'validation_type' => 'simple_text',
+		),
+	),
+
+	'custom_fields' => array(
+		'section_start'     => array(
+			'type'       => 'section_start',
+			'title'      => esc_html__( 'Custom Fields', 'bloom' ),
+			'display_if' => implode( '#', $custom_fields_support ),
+			'name'       => 'custom_fields_section',
+		),
+		'use_custom_fields' => array(
+			'name'            => 'use_custom_fields',
+			'type'            => 'use_custom_fields',
+			'validation_type' => 'simple_text',
+		),
+		'custom_fields'     => array(
+			'name'            => 'custom_fields',
+			'type'            => 'custom_fields',
 			'validation_type' => 'simple_text',
 		),
 	),
@@ -581,10 +634,10 @@ $dashboard_options_all = array(
 			'type'            => 'text',
 			'rows'            => '3',
 			'name'            => 'footer_text',
-			'class'           => 'et_dashboard_footer_text',
-			'placeholder'     => esc_html__( 'insert your footer text', 'bloom' ),
+			'class'           => 'et_dashboard_footer_text et_dashboard_mce',
+			'placeholder'     => esc_html__( 'Insert your footer text', 'bloom' ),
 			'default'         => '',
-			'validation_type' => 'simple_text',
+			'validation_type' => 'html',
 			'is_wpml_string'  => true,
 		),
 	),
@@ -637,7 +690,6 @@ $dashboard_options_all = array(
 				'slideright'   => esc_html__( 'Slide Right', 'bloom' ),
 				'slideup'      => esc_html__( 'Slide Up', 'bloom' ),
 				'slidedown'    => esc_html__( 'Slide Down', 'bloom' ),
-				'slideup'      => esc_html__( 'Slide Up', 'bloom' ),
 				'lightspeedin' => esc_html__( 'Light Speed', 'bloom' ),
 				'zoomin'       => esc_html__( 'Zoom In', 'bloom' ),
 				'flipinx'      => esc_html__( 'Flip', 'bloom' ),
@@ -1118,6 +1170,11 @@ $dashboard_options_all = array(
 		'type'  => 'updates',
 		'title' => esc_html__( 'Bloom Updates', 'bloom' ),
 	),
+	
+	'settings' => array(
+		'type'  => 'settings',
+		'title' => esc_html__( 'Bloom Settings', 'bloom' ),
+	),
 
 	'accounts' => array(
 		'type'  => 'account',
@@ -1181,6 +1238,7 @@ $assigned_options = array(
 			$dashboard_options_all[ 'form_integration' ][ 'select_account' ],
 			$dashboard_options_all[ 'form_integration' ][ 'email_list' ],
 			$dashboard_options_all[ 'form_integration' ][ 'custom_html' ],
+			$dashboard_options_all[ 'form_integration' ][ 'ip_address' ],
 			$dashboard_options_all[ 'form_integration' ][ 'disable_dbl_optin' ],
 			$dashboard_options_all[ 'form_integration' ][ 'enable_dbl_optin' ],
 			$dashboard_options_all[ 'form_integration' ][ 'message_id' ],
@@ -1224,10 +1282,17 @@ $assigned_options = array(
 			$dashboard_options_all[ 'form_setup' ][ 'name_fields' ],
 			$dashboard_options_all[ 'form_setup' ][ 'name_text' ],
 			$dashboard_options_all[ 'form_setup' ][ 'single_name_text' ],
+			$dashboard_options_all[ 'form_setup' ][ 'name_fullwidth' ],
 			$dashboard_options_all[ 'form_setup' ][ 'last_name' ],
+			$dashboard_options_all[ 'form_setup' ][ 'last_name_fullwidth' ],
 			$dashboard_options_all[ 'form_setup' ][ 'email_text' ],
+			$dashboard_options_all[ 'form_setup' ][ 'email_fullwidth' ],
 			$dashboard_options_all[ 'form_setup' ][ 'button_text' ],
 		$dashboard_options_all[ 'end_of_section' ],
+		$dashboard_options_all['custom_fields']['section_start'],
+			$dashboard_options_all['custom_fields']['use_custom_fields'],
+			$dashboard_options_all['custom_fields']['custom_fields'],
+		$dashboard_options_all['end_of_section'],
 		$dashboard_options_all[ 'form_styling' ][ 'section_start' ],
 			$dashboard_options_all[ 'form_styling' ][ 'field_orientation' ],
 			$dashboard_options_all[ 'form_styling' ][ 'field_corner' ],
@@ -1316,5 +1381,8 @@ $assigned_options = array(
 	),
 	'header_updates_options' => array(
 		$dashboard_options_all[ 'updates' ],
+	),
+	'header_settings_options' => array(
+		$dashboard_options_all[ 'settings' ],
 	),
 );

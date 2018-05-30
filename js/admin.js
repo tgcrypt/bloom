@@ -27,6 +27,11 @@
 			}
 		}
 
+		// Add et_dashboard_hidden_nav if no menu present on admin page load
+		if ($('#et_dashboard_navigation.et_dashboard_visible_nav').length < 1) {
+			$('#et_dashboard_wrapper').addClass('et_dashboard_hidden_nav');
+		}
+
 		// initiate the stats data updating
 		if ( et_bloom_all_optins_array.length > 0 ) {
 			update_stats_data( et_bloom_all_optins_array[0] );
@@ -553,6 +558,13 @@
 
 			save_updates_tab( username, api_key, $form_container.find( '.spinner' ) );
 		} );
+		
+		$('body').on( 'click', '.et_pb_save_google_settings', function() {
+			var $form_container = $(this).closest('.et_dashboard_form');
+			var google_fonts_val = $form_container.find('#et_use_google_fonts').prop('checked') ? 'on' : 'off';
+
+			save_google_tab(google_fonts_val, $form_container.find('.spinner'));
+		} );
 
 		$( 'body' ).on( 'click', '.et_dashboard_icon_abtest:not(.active_child_optins)', function(){
 			var table_row = $( this ).parent().parent();
@@ -891,7 +903,7 @@
 
 			//fix the removing of tinymce editors in FireFox
 
-			tinymce.init({
+			window.et_dashboard_tinymce_wrapper({
 				mode : 'specific_textareas',
 				editor_selector : 'et_dashboard_optin_title',
 				menubar : false,
@@ -902,15 +914,25 @@
 				]
 			});
 
-			tinymce.init({
+			window.et_dashboard_tinymce_wrapper({
 				mode : 'specific_textareas',
 				editor_selector : 'et_dashboard_optin_message',
 				menubar : false,
-				plugins: "textcolor",
+				plugins: "textcolor autolink link",
 				toolbar: [
-					"forecolor | bold italic | alignleft aligncenter alignright"
+					"forecolor | bold italic | alignleft aligncenter alignright | link"
 				]
 			});
+
+			window.et_dashboard_tinymce_wrapper( {
+				mode:            'specific_textareas',
+				editor_selector: 'et_dashboard_footer_text',
+				menubar:         false,
+				plugins:         "textcolor autolink link",
+				toolbar:         [
+					"forecolor | bold italic | alignleft aligncenter alignright | link"
+				]
+			} );
 		}
 
 		function reset_options( $this_el, $form_id, $new_form, $is_child, $parent_id ) {
@@ -923,8 +945,14 @@
 					reset_optin_id : $form_id
 				},
 				success: function( data ){
-					$( '#et_dashboard_wrapper_outer' ).replaceWith(data);
+					$( '#et_dashboard_wrapper_outer' ).replaceWith(data.data.dashboard_html);
 					open_optin_settings( $this_el, $new_form, $is_child, $parent_id );
+
+					window.et_bloom_custom_field_definitions = data.data.custom_field_definitions;
+					window.et_bloom_setting_values           = data.data.setting_values;
+					window.et_bloom_predefined_custom_fields = data.data.predefined_custom_fields;
+
+					et_bloom_custom_field_manager_init();
 
 					if ( true == $new_form ) {
 						$( '.et_dashboard_next_design button' ).addClass( 'et_bloom_open_premade' );
@@ -1467,6 +1495,24 @@
 				},
 				success: function( data ){
 					$spinner.removeClass( 'et_dashboard_spinner_visible' );
+				}
+			});
+		}
+		function save_google_tab(use_fonts_value, $spinner) {
+			$.ajax({
+				type: 'POST',
+				url: bloom_settings.ajaxurl,
+				data: {
+					action : 'bloom_save_google_tab',
+					google_tab_nonce : bloom_settings.google_tab,
+					et_bloom_use_google_fonts : use_fonts_value
+				},
+				beforeSend: function() {
+					$spinner.addClass('et_dashboard_spinner_visible');
+				},
+				success: function(data) {
+					$spinner.removeClass('et_dashboard_spinner_visible');
+					window.location.reload();
 				}
 			});
 		}

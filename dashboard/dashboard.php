@@ -30,6 +30,11 @@ class ET_Dashboard {
 	var $protocol;
 	var $plugin_name;
 
+	/**
+	 * @var ET_Core_Data_Utils
+	 */
+	protected static $_;
+
 	function __construct( $args ) {
 		//define filterable variables
 		$this->_options_pagename = isset( $args['et_dashboard_options_pagename'] ) ? $args['et_dashboard_options_pagename'] : 'et_dashboard';
@@ -54,6 +59,8 @@ class ET_Dashboard {
 
 		add_action( 'admin_init', array( $this, 'process_settings_export' ) );
 		add_action( 'admin_init', array( $this, 'process_settings_import' ) );
+
+		self::$_ = ET_Core_Data_Utils::instance();
 	}
 
 	/**
@@ -119,11 +126,53 @@ class ET_Dashboard {
 			return;
 		}
 
+		$DEBUG        = defined( 'ET_DEBUG' ) && ET_DEBUG;
+		$core_scripts = ET_CORE_URL . '/admin/js';
+		$bundle_url   = ET_DASHBOARD_PLUGIN_URI . '/js/bloom-dashboard.bundle.min.js';
+
+		if ( $DEBUG ) {
+			wp_enqueue_script( 'react', 'https://cdn.jsdelivr.net/npm/react@16.2/umd/react.development.js', array(), '16.2', true );
+			wp_enqueue_script( 'react-dom', 'https://cdn.jsdelivr.net/npm/react-dom@16.2/umd/react-dom.development.js', array( 'react' ), '16.2', true );
+			add_filter( 'script_loader_tag', 'et_core_add_crossorigin_attribute', 10, 3 );
+		} else {
+			wp_enqueue_script( 'react', "{$core_scripts}/react.production.min.js", array(), '16.2', true );
+			wp_enqueue_script( 'react-dom', "{$core_scripts}/react-dom.production.min.js", array( 'react' ), '16.2', true );
+		}
+
+		if ( $DEBUG ) {
+			$site_url = wp_parse_url( get_site_url() );
+			$hot_bundle_url = "{$site_url['scheme']}://{$site_url['host']}:31495/bloom-dashboard.bundle.min.js";
+
+			wp_enqueue_script( 'et-bloom-dashboard-bundle', $hot_bundle_url, array(
+				'jquery',
+				'react',
+				'react-dom'
+			), $this->class_version, true );
+
+			// Add the bundle as fallback in case webpack-dev-server is not running
+			wp_add_inline_script(
+				'et-bloom-dashboard-bundle',
+				sprintf( 'window.et_bloom_custom_field_manager_init || document.write(\'<script src="%s">\x3C/script>\')', "{$bundle_url}?ver={$this->class_version}" ),
+				'after'
+			);
+
+		} else {
+			wp_enqueue_script( 'et-bloom-dashboard-bundle', $bundle_url, array( 'jquery', 'react', 'react-dom' ), $this->class_version, true );
+		}
+
 		wp_enqueue_script( 'et-dashboard-mce-js', ET_DASHBOARD_PLUGIN_URI . '/js/tinymce/js/tinymce/tinymce.min.js', array( 'jquery' ), $this->class_version, true );
+		wp_enqueue_script( 'et-dashboard-custom-mce-js', ET_DASHBOARD_PLUGIN_URI . '/js/et_custom_mce.js', array( 'jquery', 'et-dashboard-mce-js' ), $this->class_version, true );
 		wp_enqueue_style( 'et-dashboard-css', ET_DASHBOARD_PLUGIN_URI . '/css/et_dashboard.css', array(), $this->class_version );
-		wp_enqueue_script( 'et-dashboard-js', ET_DASHBOARD_PLUGIN_URI . '/js/et_dashboard.js', array( 'jquery' ), $this->class_version, true );
+		wp_enqueue_script( 'et-dashboard-js', ET_DASHBOARD_PLUGIN_URI . '/js/et_dashboard.js', array( 'jquery', 'et-bloom-dashboard-bundle' ), $this->class_version, true );
 		wp_enqueue_script( 'wp-color-picker' );
 		wp_enqueue_style( 'wp-color-picker' );
+
+		if ( ! $DEBUG ) {
+			$styles_url = ET_DASHBOARD_PLUGIN_URI . '/css/bloom-dashboard-style.min.css';
+
+			wp_enqueue_style( 'et-bloom-dashboard-styles', $styles_url, array( 'et-dashboard-css' ), $this->class_version );
+		}
+
 		wp_enqueue_media();
 
 		wp_localize_script( 'et-dashboard-js', 'dashboardSettings', array(
@@ -133,7 +182,24 @@ class ET_Dashboard {
 			'save_settings'    => wp_create_nonce( 'save_settings' ),
 			'generate_warning' => wp_create_nonce( 'generate_warning' ),
 			'plugin_class'     => $this->plugin_class_name,
+			'i18n'             => array(
+				'addNewField'    => esc_html__( 'Add New Custom Field', 'bloom' ),
+				'linkCancel'     => esc_html__( 'Cancel', 'bloom' ),
+				'linkSave'       => esc_html__( 'Save', 'bloom' ),
+				'linkURL'        => esc_html__( 'Link URL', 'bloom' ),
+				'linkText'       => esc_html__( 'Link Text', 'bloom' ),
+				'done'           => esc_html__( 'Done', 'bloom' ),
+				'linkSettings'   => esc_html__( 'Option Link', 'bloom' ),
+				'noCustomFields' => esc_html__( 'You have not defined any custom fields in your email provider account. Once you have defined some fields, click Update Lists button for appropriate account on the Email Accounts tab', 'bloom' ),
+			),
 		) );
+
+		wp_localize_script( 'et-dashboard-custom-mce-js', 'dashboardEditor', array(
+			'text'   => esc_html__( 'Text', 'et_dashboard' ),
+			'visual' => esc_html__( 'Visual', 'et_dashboard' ),
+		) );
+
+
 	}
 
 	/**
@@ -537,6 +603,10 @@ class ET_Dashboard {
 														: $option_sub_title;
 													icl_register_string( $this->plugin_name, $wpml_option_name, sanitize_text_field( $current_option_value ) );
 												}
+
+											if ( 'checkbox' === $option['type'] && ! empty( $current_option_value ) ) {
+												$dashboard_options_temp[ $current_option_name ] = '1' === $current_option_value ? 'true' : 'false';
+											};
 										break;
 
 										case 'boolean' :
@@ -632,6 +702,12 @@ class ET_Dashboard {
 	function generate_options_page( $sub_array = '' ) {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			die( -1 );
+		}
+
+		if ( $sub_array && wp_doing_ajax() ) {
+			// This request is from the dashboard script to load opt-in settings. We need to send
+			// custom fields data along with the dashboard HTML so we don't want to print anything yet.
+			ob_start();
 		}
 
 		$this->dashboard_options = $this->get_options_array();
@@ -839,6 +915,12 @@ class ET_Dashboard {
 								break;
 
 								case 'checkbox' :
+									$checked_value = 1;
+
+									if ( 'simple_text' === self::$_->array_get( $option, 'validation_type' ) ) {
+										$checked_value = 'true';
+									};
+
 									printf( '
 										<li class="et_dashboard_checkbox clearfix%5$s%6$s%9$s"%4$s%7$s%8$s>
 											<p>%1$s</p>
@@ -846,7 +928,7 @@ class ET_Dashboard {
 											<label for="et_dashboard[%2$s]"></label>',
 										isset( $option['title_' . $current_location] ) ? esc_html( $option['title_' . $current_location] ) : esc_html( $option['title'] ),
 										esc_attr( $current_option_name ),
-										checked( $current_option_value, 1, false ),
+										checked( $current_option_value, $checked_value, false ),
 										( isset( $option[ 'conditional' ] )
 											? sprintf( ' data-enables="%1$s"',  '' !== $sub_array
 												? esc_attr( $option[ 'conditional' ] )
@@ -1329,6 +1411,17 @@ class ET_Dashboard {
 									echo '</li>';
 								break;
 
+								case 'custom_fields':
+									echo '<li id="et-fb-app"><div id="et_bloom_custom_field_manager"/></li>';
+								break;
+
+								case 'react-portal-container':
+									printf('<li class="et_bloom_react_portal_%1$s et_bloom_react_portal_empty" data-label="%2$s"></li>',
+										esc_attr( $current_option_name ),
+										esc_attr( $option['title'] )
+									);
+								break;
+
 							} // end switch
 
 							do_action( 'et_' . $this->plugin_name . '_after_main_options', $option, $current_option_value );
@@ -1434,6 +1527,17 @@ class ET_Dashboard {
 				</div>
 			</div>
 		</div>';
+
+		if ( $sub_array && wp_doing_ajax() ) {
+			$data = array(
+				'dashboard_html'           => ob_get_clean(),
+				'custom_field_definitions' => ET_Core_API_Email_Fields::get_definitions( 'bloom' ),
+				'setting_values'           => self::$_->array_get( $dashboard_options, $sub_array, new stdClass ),
+				'predefined_custom_fields' => ET_Core_API_Email_Providers::instance()->custom_fields_data(),
+			);
+
+			wp_send_json_success( $data );
+		}
 	}
 
 	/**

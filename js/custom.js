@@ -12,6 +12,18 @@
 			return false;
 		});
 
+		function toggle_checkbox(element, value) {
+			$(element).children('i').toggleClass('et_bloom_icon et_bloom_icon_check');
+		}
+
+		$('body .et_bloom_custom_field_checkbox input[type=checkbox]:checked').each(function() {
+			toggle_checkbox($(this).next('label'));
+		});
+
+		$('body').on('click', '.et_bloom_custom_field_checkbox label', function() {
+			toggle_checkbox(this);
+		});
+
 		function perform_popup_closing( $popup_container ) {
 			$popup_container.addClass( 'et_bloom_exit_animation' );
 
@@ -27,7 +39,7 @@
 
 		}
 
-		function update_stats_table( $type, $this_button ) {
+		function update_stats_table( type, $this_button ) {
 			// do not update stats if visitor logged in
 			if ( 'logged' === bloomSettings.is_user_logged_in ) {
 				return;
@@ -37,7 +49,14 @@
 				$page_id = $this_button.data( 'page_id' ),
 				$list_id = $this_button.data( 'list_id' );
 
-			$stats_data = JSON.stringify({ 'type' : $type, 'optin_id' : $optin_id, 'page_id' : $page_id, 'list_id' : $list_id });
+			var cookie = 'et_bloom_optin_'.concat( $optin_id, '_', $list_id, '_', type );
+
+			if ( cookieExists( cookie ) ) {
+				return;
+			}
+
+			$stats_data = JSON.stringify({ 'type' : type, 'optin_id' : $optin_id, 'page_id' : $page_id, 'list_id' : $list_id });
+
 			$.ajax({
 				type: 'POST',
 				url: bloomSettings.ajaxurl,
@@ -46,6 +65,8 @@
 					stats_data_array : $stats_data,
 					update_stats_nonce : bloomSettings.stats_nonce
 				}
+			}).done( function() {
+				set_cookie( 365, cookie.concat( '=true' ) );
 			});
 		}
 
@@ -60,6 +81,10 @@
 
 		function checkCookieValue( cookieName, value ) {
 			return parseCookies()[cookieName] == value;
+		}
+
+		function cookieExists( cookie_name ) {
+			return 'undefined' !== typeof parseCookies()[cookie_name];
 		}
 
 		function parseCookies() {
@@ -174,6 +199,37 @@
 					}
 				});
 			}
+		}
+
+		$.fn.isInViewport = function() {
+			var elementTop     = $( this ).offset().top;
+			var elementBottom  = elementTop + $( this ).outerHeight();
+			var viewportTop    = $( window ).scrollTop();
+			var viewportBottom = viewportTop + $( window ).height();
+
+			return elementBottom > viewportTop && elementTop < viewportBottom;
+		};
+
+		var $inline_optins = $( '.et_bloom_inline_form .et_bloom_submit_subscription, .et_bloom_widget_content .et_bloom_submit_subscription, .et_bloom_custom_html_form' );
+
+		if ( $inline_optins.length > 0 ) {
+			var imp_recorded_count = 0;
+
+			$(window).on( 'scroll.et_bloom_impressions', function() {
+				$inline_optins.each( function() {
+					if ( ! $(this).hasClass( 'et_bloom_impression_recorded' ) && $(this).isInViewport() ) {
+						$( this ).addClass( 'et_bloom_impression_recorded' );
+
+						imp_recorded_count++;
+
+						update_stats_table( 'imp', $(this) );
+					}
+				} );
+
+				if ( imp_recorded_count >= $inline_optins.length ) {
+					$(window).off( 'scroll.et_bloom_impressions' );
+				}
+			} );
 		}
 
 		 if( $( '.et_bloom_auto_popup' ).length ) {
@@ -329,14 +385,6 @@
 				form_height = this_popup.find( 'form' ).innerHeight() + $message_space,
 				form_add = true == $just_loaded ? 5 : 0;
 
-			if ( this_popup.find( '.et_bloom_form_header' ).hasClass('split' ) ) {
-				var image_height = this_popup.find( '.et_bloom_form_header img' ).innerHeight(),
-					text_height = this_popup.find( '.et_bloom_form_header .et_bloom_form_text' ).innerHeight(),
-					header_height = image_height < text_height ? text_height + 30 : image_height + 30;
-			} else {
-				var header_height = this_popup.find( '.et_bloom_form_header img' ).innerHeight() + this_popup.find( '.et_bloom_form_header .et_bloom_form_text' ).innerHeight() + 30;
-			}
-
 			this_popup.css( { 'max-height' : popup_max_height } );
 
 			if ( this_popup.hasClass( 'et_bloom_popup_container' ) ) {
@@ -352,17 +400,13 @@
 					this_popup.find( '.et_bloom_form_header' ).css( { 'height' : 'auto' } );
 				}
 
-				real_popup_height = this_popup.find( '.et_bloom_form_header' ).innerHeight() + this_popup.find( '.et_bloom_form_content' ).innerHeight() + 30 + form_add;
+				real_popup_height = this_popup.find( '.et_bloom_form_container_wrapper' ).height() + 30 + form_add;
 
 				if ( this_popup.hasClass( 'et_bloom_form_right' ) || this_popup.hasClass( 'et_bloom_form_left' ) ) {
 					this_popup.find( '.et_bloom_form_container_wrapper' ).css( { 'height' : real_popup_height - 30 + dashed_offset } );
 				}
 			} else {
-				if ( header_height < form_height ) {
-					real_popup_height = this_popup.find( 'form' ).innerHeight() + 30 + $message_space;
-				} else {
-					real_popup_height = header_height + 30;
-				}
+				real_popup_height = this_popup.find( '.et_bloom_form_container_wrapper' ).height() + $message_space;
 
 				if ( this_popup.hasClass( 'et_bloom_form_right' ) || this_popup.hasClass( 'et_bloom_form_left' ) ) {
 					this_popup.find( '.et_bloom_form_header' ).css( { 'height' : real_popup_height * breakout_offset - dashed_offset } );
@@ -387,30 +431,146 @@
 			return false;
 		});
 
-		function perform_subscription( this_button, current_container, container_id, locked_page_id, locked_optin_id ) {
-			var this_form = this_button.parent(),
-				list_id = this_button.data( 'list_id' ),
-				account_name = this_button.data( 'account' ),
-				service = this_button.data( 'service' ),
-				name = this_form.find( '.et_bloom_subscribe_name input' ).val(),
-				last_name = undefined != this_form.find( '.et_bloom_subscribe_last input' ).val() ? this_form.find( '.et_bloom_subscribe_last input' ).val() : '',
-				email = this_form.find( '.et_bloom_subscribe_email input' ).val(),
-				page_id = this_button.data( 'page_id' ),
-				optin_id = this_button.data( 'optin_id' ),
-				disable_dbl_optin = this_button.data( 'disable_dbl_optin' ),
-				$popup_container = this_form.closest( '.et_bloom_optin' ),
-				is_popup = $popup_container.hasClass( 'et_bloom_popup' ) || $popup_container.hasClass( 'et_bloom_flyin' ),
-				$success_action_el = this_button.closest('.et_bloom_success_action'),
-				success_action_details = $success_action_el.length > 0 ? $success_action_el.parent().data( 'success_action_details' ).split( '|' ) : [],
-				success_action = 2 === success_action_details.length ? success_action_details[0] : '',
-				success_action_url = '' !== success_action ? success_action_details[1] : '';
+		function perform_subscription(this_button, current_container, container_id, locked_page_id, locked_optin_id) {
+			var this_form = this_button.parents('form');
+			var list_id = this_button.data('list_id');
+			var account_name = this_button.data('account');
+			var service = this_button.data('service');
+			var name = this_form.find('.et_bloom_subscribe_name input').val();
+			var last_name = undefined !== this_form.find('.et_bloom_subscribe_last input').val() ? this_form.find('.et_bloom_subscribe_last input').val() : '';
+			var email = this_form.find('.et_bloom_subscribe_email input').val();
+			var page_id = this_button.data('page_id');
+			var optin_id = this_button.data('optin_id');
+			var disable_dbl_optin = this_button.data('disable_dbl_optin');
+			var $popup_container = this_form.closest('.et_bloom_optin');
+			var is_popup = $popup_container.hasClass('et_bloom_popup') || $popup_container.hasClass('et_bloom_flyin');
+			var $success_action_el = this_button.closest('.et_bloom_success_action');
+			var success_action_details = $success_action_el.length > 0 ? $success_action_el.parent().data('success_action_details').split('|') : [];
+			var success_action = 2 === success_action_details.length ? success_action_details[0] : '';
+			var success_action_url = '' !== success_action ? success_action_details[1] : '';
 
-			this_form.find( '.et_bloom_subscribe_email input' ).removeClass( 'et_bloom_warn_field' );
+			var ip_address        = this_button.data('ip_address');
+			var $fields_container = this_form.find('.et_bloom_fields');
+			var $custom_fields    = $fields_container.find('.et_bloom_custom_field input[type=text], .et_bloom_checkbox_handle, [data-field_type="radio"], textarea, select');
+			var custom_fields     = {};
+			var is_valid          = true;
+			
+			// Email Validation
+			// Use the regex defined in the HTML5 spec for input[type=email] validation
+			// (see https://www.w3.org/TR/2016/REC-html51-20161101/sec-forms.html#email-state-typeemail)
+			var et_email_reg_html5 = /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+			
+			this_form.find('.et_bloom_warn_field').removeClass('et_bloom_warn_field');
 
-			if ( '' == email ) {
-				this_form.find( '.et_bloom_subscribe_email input' ).addClass( 'et_bloom_warn_field' );
+			if (this_form.length > 0 && typeof this_form[0].reportValidity === 'function') {
+				// Checks HTML5 validation constraints
+				is_valid = this_form[0].reportValidity();
+			}
+
+			$custom_fields.each( function() {
+				var $this_el      = $(this);
+				var $this_wrapper = false;
+				var this_id       = $this_el.attr('data-id');
+				var field_type    = typeof $this_el.data( 'field_type' ) !== 'undefined' ? $this_el.data( 'field_type' ) : 'text';
+
+				if ('checkbox' === field_type || 'radio' === field_type) {
+					$this_wrapper = $this_el.closest('.et_bloom_custom_field');
+				}
+
+				var this_val      = $this_el.val();
+				var required_mark = typeof $this_el.data('required_mark') !== 'undefined' ? $this_el.data('required_mark') : 'not_required';
+				var original_id   = typeof $this_el.data('original_id') !== 'undefined' ? $this_el.data('original_id') : '';
+				var unchecked     = false;
+				var default_value;
+
+				// radio field properties adjustment
+				if ('radio' === field_type) {
+					if (0 !== $this_wrapper.find('input[type="radio"]').length) {
+						var $firstRadio = $this_wrapper.find('input[type="radio"]:first');
+
+						required_mark = typeof $firstRadio.data('required_mark') !== 'undefined' ? $firstRadio.data('required_mark') : 'not_required';
+
+						this_val = '';
+
+						if ($this_wrapper.find('input[type="radio"]:checked')) {
+							this_val = $this_wrapper.find('input[type="radio"]:checked').val();
+						}
+					}
+
+					if (!$.isEmptyObject(this_val)) {
+						custom_fields[this_id] = this_val;
+					}
+
+					if (0 === $this_wrapper.find('input[type="radio"]:checked').length) {
+						unchecked = true;
+					}
+
+					if (this_val) {
+						custom_fields[this_id] = this_val;
+					}
+				} else if ('checkbox' === field_type) {
+					this_val = {};
+
+					if ( 0 !== $this_wrapper.find('input[type="checkbox"]').length) {
+						var $checkboxHandle = $this_wrapper.find('.et_bloom_checkbox_handle');
+
+						required_mark = typeof $checkboxHandle.data('required_mark') !== 'undefined' ? $checkboxHandle.data('required_mark') : 'not_required';
+
+						if ($this_wrapper.find('input[type="checkbox"]:checked').length > 0) {
+							$this_wrapper.find('input[type="checkbox"]:checked').each(function() {
+								var field_id       = $(this).data('id');
+								this_val[field_id] = $(this).val();
+							} );
+						}
+					}
+
+					if (!$.isEmptyObject(this_val)) {
+						custom_fields[this_id] = this_val;
+					}
+
+					if (0 === $this_wrapper.find('input[type="checkbox"]:checked').length) {
+						unchecked = true;
+					}
+				} else if ('ontraport' === service && 'select' === field_type) {
+					// Need to pass option ID as a value for dropdown menu in Ontraport
+					var $selected_option   = $this_el.find(':selected');
+					custom_fields[this_id] = $selected_option.length > 0 ? $selected_option.data('id') : this_val;
+				} else {
+					custom_fields[this_id] = this_val;
+				}
+
+				// add error message for the field if it is required and empty
+				if ('required' === required_mark && ('' === this_val || true === unchecked)) {
+					if (false === $this_wrapper) {
+						$this_el.addClass('et_bloom_warn_field');
+					} else {
+						$this_wrapper.addClass('et_bloom_warn_field');
+					}
+
+					is_valid = false;
+				}
+
+				if ('email' === field_type) {
+					// remove trailing/leading spaces and convert email to lowercase
+					var processed_email = this_val.trim().toLowerCase();
+					var is_valid_email = et_email_reg_html5.test(processed_email);
+					
+					if ('' !== processed_email && !is_valid_email) {
+						$this_el.addClass('et_bloom_warn_field');
+						is_valid = false;
+					}
+				}
+			} );
+
+			if (! is_valid) {
+				return;
+			}
+
+			if ('' == email) {
+				this_form.find('.et_bloom_subscribe_email input').addClass('et_bloom_warn_field');
 			} else {
-				$subscribe_data = JSON.stringify({ 'list_id' : list_id, 'account_name' : account_name, 'service' : service, 'name' : name, 'email' : email, 'page_id' : page_id, 'optin_id' : optin_id, 'last_name' : last_name, 'dbl_optin' : disable_dbl_optin });
+				ip_address = ip_address ? 'true' : 'false';
+				$subscribe_data = JSON.stringify({ 'list_id' : list_id, 'account_name' : account_name, 'service' : service, 'name' : name, 'email' : email, 'page_id' : page_id, 'optin_id' : optin_id, 'last_name' : last_name, 'dbl_optin' : disable_dbl_optin, 'ip_address': ip_address });
 				$.ajax({
 					type: 'POST',
 					dataType: 'json',
@@ -418,46 +578,47 @@
 					data: {
 						action : 'bloom_subscribe',
 						subscribe_data_array : $subscribe_data,
+						custom_fields: custom_fields,
 						subscribe_nonce : bloomSettings.subscribe_nonce
 					},
-					beforeSend: function( data ) {
-						this_button.addClass( 'et_bloom_button_text_loading' );
-						this_button.find( '.et_bloom_subscribe_loader' ).css( { 'display' : 'block' } );
+					beforeSend: function(data) {
+						this_button.addClass('et_bloom_button_text_loading');
+						this_button.find('.et_bloom_subscribe_loader').css({ 'display' : 'block' });
 					},
-					success: function( data ) {
-						this_button.removeClass( 'et_bloom_button_text_loading' );
-						this_button.find( '.et_bloom_subscribe_loader' ).css( { 'display' : 'none' } );
-						if ( data ) {
-							if ( '' != current_container && ( data.success || 'Invalid email' != data.error ) ) {
-								unlock_content( current_container, container_id, locked_page_id, locked_optin_id );
+					success: function(data) {
+						this_button.removeClass('et_bloom_button_text_loading');
+						this_button.find('.et_bloom_subscribe_loader').css({ 'display' : 'none' });
+						if (data) {
+							if ('' !== current_container && (data.success || 'Invalid email' !== data.error)) {
+								unlock_content(current_container, container_id, locked_page_id, locked_optin_id);
 							} else {
-								if ( data.error ) {
-									this_form.find( '.et_bloom_error_message' ).remove();
-									this_form.prepend( '<h2 class="et_bloom_error_message">' + data.error + '</h2>' );
-									this_form.parent().parent().find( '.et_bloom_form_header' ).addClass( 'et_bloom_with_error' );
+								if (data.error) {
+									this_form.find('.et_bloom_error_message').remove();
+									this_form.prepend('<h2 class="et_bloom_error_message">' + data.error + '</h2>');
+									this_form.parent().parent().find('.et_bloom_form_header').addClass('et_bloom_with_error');
 								}
-								if ( data.success && '' == current_container ) {
-									set_cookie( 365, 'et_bloom_subscribed_to_' + optin_id + list_id + '=true' );
+								if (data.success && '' == current_container) {
+									set_cookie(365, 'et_bloom_subscribed_to_' + optin_id + list_id + '=true');
 
-									if ( '' === success_action || '' === success_action_url ) {
-									  this_form.parent().find( '.et_bloom_success_message' ).addClass( 'et_bloom_animate_message' );
-									  this_form.parent().find( '.et_bloom_success_container' ).addClass( 'et_bloom_animate_success' );
+									if ('' === success_action || '' === success_action_url) {
+									  this_form.parent().find('.et_bloom_success_message').addClass('et_bloom_animate_message');
+									  this_form.parent().find('.et_bloom_success_container').addClass('et_bloom_animate_success');
 									  this_form.remove();
 									} else {
 										window.location = success_action_url;
 									}
 
 									// auto close popup if enabled
-									if ( is_popup && $popup_container.hasClass( 'et_bloom_auto_close' ) ) {
-										setTimeout( function() {
-											perform_popup_closing( $popup_container );
-										}, 1400 );
+									if (is_popup && $popup_container.hasClass('et_bloom_auto_close')) {
+										setTimeout(function() {
+											perform_popup_closing($popup_container);
+										},1400);
 									}
 								}
 							}
 
-							if ( is_popup ) {
-								define_popup_position( $popup_container, false, 50 );
+							if (is_popup) {
+								define_popup_position($popup_container, false, 50);
 							}
 						}
 					}

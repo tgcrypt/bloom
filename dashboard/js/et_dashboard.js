@@ -265,7 +265,7 @@
 		});
 
 		//Handle click on the OK button in warning window
-		$( 'body' ).on( 'click', '.et_dashboard_ok', function(){
+		$( 'body' ).on( 'click', '.et_dashboard_ok:not(.et_dashboard_form a)', function(){
 			var this_el = $( this ),
 				link = this_el.attr( 'href' ),
 				main_container = this_el.parent().parent().parent();

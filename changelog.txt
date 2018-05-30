@@ -1,3 +1,60 @@
+version 1.3 ( updated 5-25-2018 )
+- Added custom field integration for all email providers.
+- Added the ability to add links to checkbox and radio button custom field labels.
+- Added the option to disable Google Fonts.
+	* css/style.css
+	* css/admin.css
+	* dashboard/app/bootstrap.jsx
+	* dashboard/app/components/custom-fields/custom-fields.jsx
+	* dashboard/app/components/custom-fields/custom-fields.scss
+	* dashboard/css/et_dashboard.css
+	* dashboard/dashboard.php
+	* dashboard/dashboard.php
+	* dashboard/includes/google_fonts.php
+	* dashboard/includes/options.php
+	* dashboard/js/et_custom_mce.js
+	* dashboard/js/et_dashboard.js
+	* js/admin.js
+	* js/custom.js
+	* core/admin/fonts/modules.eot
+	* core/admin/fonts/modules.svg
+	* core/admin/fonts/modules.ttf
+	* core/admin/fonts/modules.woff
+	* core/admin/js/common.js
+	* core/admin/js/react-dom.production.min.js
+	* core/admin/js/react.production.min.js
+	* core/components/HTTPInterface.php
+	* core/components/api/OAuthHelper.php
+	* core/components/api/Service.php
+	* core/components/api/email/ActiveCampaign.php
+	* core/components/api/email/Aweber.php
+	* core/components/api/email/CampaignMonitor.php
+	* core/components/api/email/ConstantContact.php
+	* core/components/api/email/ConvertKit.php
+	* core/components/api/email/Emma.php
+	* core/components/api/email/Feedblitz.php
+	* core/components/api/email/Fields.php
+	* core/components/api/email/GetResponse.php
+	* core/components/api/email/HubSpot.php
+	* core/components/api/email/Infusionsoft.php
+	* core/components/api/email/MadMimi.php
+	* core/components/api/email/MailChimp.php
+	* core/components/api/email/MailPoet.php
+	* core/components/api/email/MailerLite.php
+	* core/components/api/email/Mailster.php
+	* core/components/api/email/Ontraport.php
+	* core/components/api/email/Provider.php
+	* core/components/api/email/Providers.php
+	* core/components/api/email/SalesForce.php
+	* core/components/api/email/SendinBlue.php
+	* core/components/api/email/_MailPoet2.php
+	* core/components/api/email/_MailPoet3.php
+	* core/components/api/email/iContact.php
+	* core/components/api/email/init.php
+	* core/components/data/Utils.php
+	* core/components/lib/OAuth.php
+	* core/functions.php
+
 version 1.2.25 ( updated 4-26-2018 )
 - Fixed iOS detection when page is being viewed on a mobile browser or an in-app browser.
 - Fixed double opt-in when adding new subscribers to a Mailster list.
