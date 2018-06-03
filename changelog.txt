@@ -1,3 +1,8 @@
+version 1.3.1 ( updated 5-31-2018 )
+- Updated core framework to the latest version.
+- Added extra security hardening to the OAuth2 authorization callback.
+	* core/*
+
 version 1.3 ( updated 5-25-2018 )
 - Added custom field integration for all email providers.
 - Added the ability to add links to checkbox and radio button custom field labels.
