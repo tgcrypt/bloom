@@ -1642,17 +1642,13 @@
 						this_popup.find( '.et_bloom_form_header' ).css( { 'height' : 'auto' } );
 					}
 
-					real_popup_height = this_popup.find( '.et_bloom_form_header' ).innerHeight() + this_popup.find( '.et_bloom_form_content' ).innerHeight() + 30 + form_add;
+					real_popup_height = this_popup.find( '.et_bloom_form_container_wrapper' ).height() + 30 + form_add;
 
 					if ( this_popup.hasClass( 'et_bloom_form_right' ) || this_popup.hasClass( 'et_bloom_form_left' ) ) {
 						this_popup.find( '.et_bloom_form_container_wrapper' ).css( { 'height' : real_popup_height - 30 + dashed_offset } );
 					}
 				} else {
-					if ( header_height < form_height ) {
-						real_popup_height = this_popup.find( 'form' ).innerHeight() + 30;
-					} else {
-						real_popup_height = header_height + 30;
-					}
+					real_popup_height = this_popup.find( '.et_bloom_form_container_wrapper' ).height();
 
 					if ( this_popup.hasClass( 'et_bloom_form_right' ) || this_popup.hasClass( 'et_bloom_form_left' ) ) {
 						this_popup.find( '.et_bloom_form_header' ).css( { 'height' : real_popup_height * breakout_offset - dashed_offset } );

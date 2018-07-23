@@ -113,7 +113,7 @@
 /*------------ WIDGET -------------*/
 /*---------------------------------*/
 .et_bloom .et_bloom_widget_content span.et_bloom_close_button { display: none; }
-.et_bloom .et_bloom_widget_content .et_bloom_form_container { box-shadow: none !important; -webkit-box-shadow: none !important; -moz-box-shadow: none !important; width: 100%; max-width: 100%; z-index: 99; }
+.et_bloom .et_bloom_widget_content .et_bloom_form_container { box-shadow: none !important; -webkit-box-shadow: none !important; -moz-box-shadow: none !important; width: auto; max-width: 100%; z-index: 99; }
 
 /* css for forms */
 
@@ -729,11 +729,7 @@
 }
 
 @media screen and ( min-width: 768px ) {
-.et_bloom .et_bloom_form_container.et_bloom_form_right .et_bloom_form_content, .et_bloom .et_bloom_form_container.et_bloom_form_left .et_bloom_form_content { width: 34%; height: 100%; float: none; }
-.et_bloom .et_bloom_form_left :not(.et_bloom_with_custom_fields) .et_bloom_3_fields form, .et_bloom .et_bloom_form_right :not(.et_bloom_with_custom_fields) .et_bloom_3_fields form { height: 200px; }
-.et_bloom .et_bloom_form_left :not(.et_bloom_with_custom_fields) .et_bloom_2_fields form, .et_bloom .et_bloom_form_right :not(.et_bloom_with_custom_fields) .et_bloom_2_fields form { height: 148px; }
-.et_bloom .et_bloom_form_left :not(.et_bloom_with_custom_fields) .et_bloom_1_field form, .et_bloom .et_bloom_form_right :not(.et_bloom_with_custom_fields) .et_bloom_1_field form { height: 94px; }
-.et_bloom .et_bloom_form_left :not(.et_bloom_with_custom_fields) .et_bloom_form_content form, .et_bloom .et_bloom_form_right :not(.et_bloom_with_custom_fields) .et_bloom_form_content form { -webkit-box-sizing: content-box; -moz-box-sizing: content-box; box-sizing: content-box; margin: auto; position: absolute; top: 0; left: 0; bottom: 0; right: 0; padding: 30px; }
+.et_bloom .et_bloom_form_container.et_bloom_form_right .et_bloom_form_content, .et_bloom .et_bloom_form_container.et_bloom_form_left .et_bloom_form_content { width: 34%; height: inherit; float: none; display: flex; flex-direction: column; justify-content: center; }
 .et_bloom .et_bloom_form_container.et_bloom_form_right .et_bloom_form_content { right: 0; }
 
 .et_bloom .et_bloom_form_right.et_bloom_rounded_corners .et_bloom_form_header { -webkit-border-top-left-radius: 5px; -webkit-border-bottom-left-radius: 5px; -moz-border-radius-topleft: 5px; -moz-border-radius-bottomleft: 5px; border-top-left-radius: 5px; border-bottom-left-radius: 5px; }

@@ -2,7 +2,7 @@
 /*
  * Plugin Name: Bloom
  * Plugin URI: http://www.elegantthemes.com/plugins/bloom/
- * Version: 1.3.1
+ * Version: 1.3.3
  * Description: A simple, comprehensive and beautifully constructed email opt-in plugin built to help you quickly grow your mailing list.
  * Author: Elegant Themes
  * Author URI: http://www.elegantthemes.com
@@ -21,7 +21,7 @@ if ( ! class_exists( 'ET_Dashboard' ) ) {
 }
 
 class ET_Bloom extends ET_Dashboard {
-	var $plugin_version = '1.3.1';
+	var $plugin_version = '1.3.3';
 	var $db_version = '1.2';
 	var $_options_pagename = 'et_bloom_options';
 	var $menu_page;
@@ -3210,6 +3210,8 @@ class ET_Bloom extends ET_Dashboard {
 		$page_id      = sanitize_text_field( $subscribe_data_array['page_id'] );
 		$optin_id     = sanitize_text_field( $subscribe_data_array['optin_id'] );
 		$email        = sanitize_email( $subscribe_data_array['email'] );
+		$name         = isset( $subscribe_data_array['name'] ) ? sanitize_text_field( $subscribe_data_array['name'] ) : '';
+		$last_name    = isset( $subscribe_data_array['last_name'] ) ? sanitize_text_field( $subscribe_data_array['last_name'] ) : '';
 		$error        = array( 'error' => esc_html__( 'Invalid input. Please try again.', 'bloom' ) );
 
 		if ( empty( $service ) || empty( $account_name ) ) {
@@ -3227,9 +3229,17 @@ class ET_Bloom extends ET_Dashboard {
 
 		$custom_fields = self::$_->sanitize_text_fields( self::$_->array_get( $_POST, 'custom_fields', array() ) );
 
-		$subscribe_data_array['custom_fields'] = $custom_fields;
-
-		$error_message = $provider->subscribe( $subscribe_data_array );
+		$error_message = $provider->subscribe( array(
+			'service'       => $service,
+			'account_name'  => $account_name,
+			'list_id'       => $list_id,
+			'page_id'       => $page_id,
+			'optin_id'      => $optin_id,
+			'email'         => $email,
+			'name'          => $name,
+			'last_name'     => $last_name,
+			'custom_fields' => $custom_fields,
+		) );
 
 		if ( 'success' === $error_message ) {
 			ET_Bloom::add_stats_record( 'con', $optin_id, $page_id, "{$service}_{$list_id}" );
@@ -3594,7 +3604,7 @@ class ET_Bloom extends ET_Dashboard {
 						case 'page' :
 						case 'home' :
 							if ( ( 'home' == $current_post_type && ( 'flyin' == $optin_type || 'pop_up' == $optin_type ) ) || 'home' != $current_post_type ) {
-								if ( ! in_array( $page_id, $current_optin_limits['pages_exclude'] ) ) {
+								if ( ! ET_Bloom::is_homepage() && ! in_array( $page_id, $current_optin_limits['pages_exclude'] ) ) {
 									$display_there = true;
 								}
 							}
@@ -4182,11 +4192,11 @@ class ET_Bloom extends ET_Dashboard {
 					<form method="post" class="clearfix">
 						<div class="et_bloom_fields">
 							%3$s
-							<p class="et_bloom_popup_input et_bloom_subscribe_email%14$s">
+							<p class="et_bloom_popup_input et_bloom_subscribe_email%13$s">
 								<input placeholder="%2$s">
 							</p>
-							%13$s
-							<button data-optin_id="%4$s" data-service="%5$s" data-list_id="%6$s" data-page_id="%7$s" data-account="%8$s" data-disable_dbl_optin="%11$s" data-ip_address="%15$s" class="et_bloom_submit_subscription%12$s">
+							%12$s
+							<button data-optin_id="%4$s" data-service="%5$s" data-list_id="%6$s" data-page_id="%7$s" data-account="%8$s" data-ip_address="%14$s" class="et_bloom_submit_subscription%11$s">
 								<span class="et_bloom_subscribe_loader"></span>
 								<span class="et_bloom_button_text et_bloom_button_text_color_%10$s">%9$s</span>
 							</button>
@@ -4232,11 +4242,10 @@ class ET_Bloom extends ET_Dashboard {
 					esc_attr( $details['account_name'] ),
 					'' != $button_text ? stripslashes( esc_html( $button_text ) ) :  esc_html__( 'SUBSCRIBE!', 'bloom' ),
 					isset( $details['button_text_color'] ) ? esc_attr( $details['button_text_color'] ) : '', // #10
-					isset( $details['disable_dbl_optin'] ) && '1' === $details['disable_dbl_optin'] ? 'disable' : '',
-					'locked' === $details['optin_type'] ? ' et_bloom_submit_subscription_locked' : '', // #12
-					$custom_fields_html,
-					$email_fullwidth ? ' et_bloom_fullwidth_field' : '',
-					$ip_address // #15
+					'locked' === $details['optin_type'] ? ' et_bloom_submit_subscription_locked' : '', // #11
+					$custom_fields_html, // #12
+					$email_fullwidth ? ' et_bloom_fullwidth_field' : '', // #13
+					$ip_address // #14
 				), //#9
 			'' != $success_text
 				? wp_kses( html_entity_decode( stripslashes( $success_text ) ), array(

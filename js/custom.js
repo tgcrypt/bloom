@@ -441,7 +441,6 @@
 			var email = this_form.find('.et_bloom_subscribe_email input').val();
 			var page_id = this_button.data('page_id');
 			var optin_id = this_button.data('optin_id');
-			var disable_dbl_optin = this_button.data('disable_dbl_optin');
 			var $popup_container = this_form.closest('.et_bloom_optin');
 			var is_popup = $popup_container.hasClass('et_bloom_popup') || $popup_container.hasClass('et_bloom_flyin');
 			var $success_action_el = this_button.closest('.et_bloom_success_action');
@@ -570,7 +569,7 @@
 				this_form.find('.et_bloom_subscribe_email input').addClass('et_bloom_warn_field');
 			} else {
 				ip_address = ip_address ? 'true' : 'false';
-				$subscribe_data = JSON.stringify({ 'list_id' : list_id, 'account_name' : account_name, 'service' : service, 'name' : name, 'email' : email, 'page_id' : page_id, 'optin_id' : optin_id, 'last_name' : last_name, 'dbl_optin' : disable_dbl_optin, 'ip_address': ip_address });
+				$subscribe_data = JSON.stringify({ 'list_id' : list_id, 'account_name' : account_name, 'service' : service, 'name' : name, 'email' : email, 'page_id' : page_id, 'optin_id' : optin_id, 'last_name' : last_name, 'ip_address': ip_address });
 				$.ajax({
 					type: 'POST',
 					dataType: 'json',
