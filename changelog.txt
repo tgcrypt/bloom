@@ -1,3 +1,10 @@
+version 1.3.4 ( updated 08-13-2018 )
+- Corrected German translation of button text in WP Admin.
+- Fixed PHP notice that was occurring since introduction of rollback feature.
+	* core/components/VersionRollback.php
+	* core/languages/de_DE.mo
+	* core/languages/de_DE.po
+
 version 1.3.3 ( updated 7-12-2018 )
 - Updated core framework to the latest version.
 - Fixed name and last name not being included in subscribe API request.
